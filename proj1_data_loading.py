@@ -4,11 +4,11 @@ import json
 import collections
 from nltk.corpus import stopwords
 import numpy as np
+import argparse
 
 class RedditComments:
 	def __init__(self):
 		self.data = None
-		self.processed_text = None
 
 	def load(self):
 		""" 
@@ -38,6 +38,11 @@ class RedditComments:
 	def preprocess(self, dd):
 		"""
 			Preprocesses the data. Converts text to all lowercase, splits into tokens
+
+			Input: dd - data to preprocess (dict)
+			Output: dd - preprocessed data
+					X - data matrix with bias (first column all 1s)
+					y - output vector 
 		"""
 		for point in dd:
 			point['text'] = point['text'].lower().split()
@@ -45,10 +50,9 @@ class RedditComments:
 				point['is_root'] = 1
 			else:
 				point['is_root'] = 0
-		self.processed_text = dd
 
-		# create data matrix X and output vector y
-		# the 1 represents x0 = 1, the bias term
+		# Creates data matrix X and output vector y
+		# The 1 represents x0 = 1, the bias term
 		initial_point = dd[0]
 		X = np.array([[1, initial_point['is_root'], initial_point['controversiality'], initial_point['children']]])
 		y = np.array([[initial_point['popularity_score']]])
@@ -57,20 +61,24 @@ class RedditComments:
 			X = np.concatenate((X, [[1, point['is_root'], point['controversiality'], point['children']]]), axis=0)
 			y = np.concatenate((y, [[point['popularity_score']]]), axis=0)
 
-		return X, y
+		return dd, X, y
 
-	def freq_dist(self):
+	def freq_dist(self, comments):
 		"""
 			Calculates frequencies of words in the text values of the given
 			data dicts
+
+			Input: comments - data points to extract frequency distribution from
+			Output: commonalities - vectors representing count of most frequent words in
+								a particular text
 		"""
 		all_words = []
-		for point in self.processed_text:
+		for point in comments:
 			text = point['text']
 			for word in text:
 				all_words.append(word)
 
-		# removes stop words
+		# Removes stop words
 		stop_words = set(stopwords.words('english')) 
 		words = [ w for w in all_words if not w in stop_words]
 
@@ -81,9 +89,9 @@ class RedditComments:
 			most_common.append(word)
 		commonalities = []
 
-		# creates a 160-dim array for every comment whose values are the number of
+		# Creates a 160-dim array for every comment whose values are the number of
 		# times the frequent words are used
-		for point in self.processed_text:
+		for point in comments:
 			xcounts = [0]*160
 			ind = 0
 			text = point['text']
@@ -134,26 +142,39 @@ class RedditComments:
 			alpha = n0 /(1 + beta[i])
 			XT = X.transpose()
 			w[i] = w[i-1] - (2 * alpha * (XT.dot(X).dot(w[i-1]) - XT.dot(y)))
-			print(w[i])
 			if np.linalg.norm(w[i] - w[i-1], ord=2) <= epsilon:
 				break
 			i += 1
 		return w[i]
 
 if __name__ == "__main__":
+
+	###################################################################################
+	# Parse the arguments, if any, to use for training (if not specified, resort to 
+	# defaults)
+	parser = argparse.ArgumentParser()
+	parser.add_argument("--n0", help="hyperparameter in gradient descent, controls initial learning rate", default=0.3)
+	parser.add_argument("--epsilon", help="error bound for gradient descent", default=0.01)
+	parser.add_argument("--maxiters", help="max iteration number for gradient descent", default=10)
+	args = parser.parse_args()
+	###################################################################################
+
+	# Create object to load comments, perform linear regression
 	redcoms = RedditComments()
 	redcoms.load()
 	#redcoms.example()
 	
-	X_train, y_train = redcoms.preprocess(redcoms.data[:10000])
-	X_val, y_val = redcoms.preprocess(redcoms.data[10000:11000])
-	X_test, y_test = redcoms.preprocess(redcoms.data[11000:12000])
+	# Preprocess text, inputs into integers to be formatted into data matrix
+	text_train, X_train, y_train = redcoms.preprocess(redcoms.data[:10000])
+	text_val, X_val, y_val = redcoms.preprocess(redcoms.data[10000:11000])
+	text_test, X_test, y_test = redcoms.preprocess(redcoms.data[11000:12000])
 
-	commonalities = redcoms.freq_dist()
+	# Find most frequent words in text
+	commonalities = redcoms.freq_dist(text_train)
 
 	w_train = redcoms.closed_form(X_train, y_train)
-	print(w_train)
+	print("Closed form weights: {}".format(w_train))
 	w0 = np.array([[0],[0],[0],[0]])
 	b = [5] * 10
-	w_train = redcoms.gradient_descent(X_train, y_train, w0, b, 0.9, 0.01, 10)
-	print(w_train)
+	w_train = redcoms.gradient_descent(X_train, y_train, w0, b, args.n0, args.epsilon, args.maxiters)
+	print("Gradient descent weights: {}".format(w_train))
