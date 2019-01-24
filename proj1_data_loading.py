@@ -2,7 +2,6 @@
 
 import json 
 import collections
-from nltk.corpus import stopwords
 import numpy as np
 import argparse
 
@@ -72,15 +71,11 @@ class RedditComments:
 			Output: commonalities - vectors representing count of most frequent words in
 								a particular text
 		"""
-		all_words = []
+		words = []
 		for point in comments:
 			text = point['text']
 			for word in text:
-				all_words.append(word)
-
-		# Removes stop words
-		stop_words = set(stopwords.words('english')) 
-		words = [ w for w in all_words if not w in stop_words]
+				words.append(word)
 
 		most_comm = collections.Counter(words).most_common(160)
 		most_common = []
@@ -153,8 +148,9 @@ if __name__ == "__main__":
 	# Parse the arguments, if any, to use for training (if not specified, resort to 
 	# defaults)
 	parser = argparse.ArgumentParser()
-	parser.add_argument("--n0", help="hyperparameter in gradient descent, controls initial learning rate", default=0.3)
-	parser.add_argument("--epsilon", help="error bound for gradient descent", default=0.01)
+	parser.add_argument("--n0", help="hyperparameter in gradient descent, controls initial learning rate", default=1e-5)
+	parser.add_argument("--beta", help="hyperparamter in gradient descent, controls speed of the decay", default=1e-4)
+	parser.add_argument("--epsilon", help="error bound for gradient descent", default=1e-6)
 	parser.add_argument("--maxiters", help="max iteration number for gradient descent", default=10)
 	args = parser.parse_args()
 	###################################################################################
@@ -175,6 +171,6 @@ if __name__ == "__main__":
 	w_train = redcoms.closed_form(X_train, y_train)
 	print("Closed form weights: {}".format(w_train))
 	w0 = np.array([[0],[0],[0],[0]])
-	b = [5] * 10
+	b = [args.beta] * args.maxiters
 	w_train = redcoms.gradient_descent(X_train, y_train, w0, b, args.n0, args.epsilon, args.maxiters)
 	print("Gradient descent weights: {}".format(w_train))
