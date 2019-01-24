@@ -2,10 +2,13 @@
 
 import json 
 import collections
+from nltk.corpus import stopwords
+import numpy as np
 
-class LinReg:
+class RedditComments:
 	def __init__(self):
 		self.data = None
+		self.processed_text = None
 
 	def load(self):
 		""" 
@@ -24,6 +27,9 @@ class LinReg:
 			self.data = json.load(fp)
 
 	def example(self):
+		"""
+			Example provided in starter code, prints a single data point
+		"""
 		data_point = self.data[0] # select the first data point in the dataset
 		# Now we print all the information about this datapoint
 		for info_name, info_value in data_point.items():
@@ -35,23 +41,48 @@ class LinReg:
 		"""
 		for point in dd:
 			point['text'] = point['text'].lower().split()
-		return dd
+			if point['is_root']:
+				point['is_root'] = 1
+			else:
+				point['is_root'] = 0
+		self.processed_text = dd
 
-	def freq_dist(self, training_set):
-		words = []
-		for point in self.data:
+		# create data matrix X and output vector y
+		initial_point = dd[0]
+		X = np.array([[initial_point['is_root'], initial_point['controversiality'], initial_point['children']]])
+		y = np.array([[initial_point['popularity_score']]])
+		for i in range(1, len(dd)):
+			point = dd[i]
+			X = np.concatenate((X, [[point['is_root'], point['controversiality'], point['children']]]), axis=0)
+			y = np.concatenate((y, [[point['popularity_score']]]), axis=0)
+
+		return X, y
+
+	def freq_dist(self):
+		"""
+			Calculates frequencies of words in the text values of the given
+			data dicts
+		"""
+		all_words = []
+		for point in self.processed_text:
 			text = point['text']
 			for word in text:
-				words.append(word)
+				all_words.append(word)
+
+		# removes stop words
+		stop_words = set(stopwords.words('english')) 
+		words = [ w for w in all_words if not w in stop_words]
+
 		most_comm = collections.Counter(words).most_common(160)
 		most_common = []
 		for tup in most_comm:
 			word = tup[0]
 			most_common.append(word)
 		commonalities = []
+
 		# creates a 160-dim array for every comment whose values are the number of
 		# times the frequent words are used
-		for point in training_set:
+		for point in self.processed_text:
 			xcounts = [0]*160
 			ind = 0
 			text = point['text']
@@ -61,15 +92,27 @@ class LinReg:
 						xcounts[ind] += 1
 				ind += 1
 			commonalities.append(xcounts)
+		return commonalities
+
+	def closed_form(self, X, y):
+		"""
+			Implements the closed-form solution w = (X^T X)^-1 X^T y, where X is
+			the data matrix and y is the output vector (popularity score vector)
+		"""
+		XT = X.transpose()
+		XTX_inverse = np.linalg.inv(XT.dot(X))
+		w = XTX_inverse.dot(XT).dot(y)
+		return w
 
 if __name__ == "__main__":
-	linreg = LinReg()
-	linreg.load()
-	linreg.example()
+	redcoms = RedditComments()
+	redcoms.load()
+	#redcoms.example()
 	
-	training = linreg.preprocess(linreg.data[:10000])
-	validation = linreg.preprocess(linreg.data[10000:11000])
-	testing = linreg.preprocess(linreg.data[11000:12000])
+	X_train, y_train = redcoms.preprocess(redcoms.data[:10000])
+	X_val, y_val = redcoms.preprocess(redcoms.data[10000:11000])
+	X_test, y_test = redcoms.preprocess(redcoms.data[11000:12000])
 
-	linreg.freq_dist(training)
+	commonalities = redcoms.freq_dist()
 
+	w_train = redcoms.closed_form(X_train, y_train)
