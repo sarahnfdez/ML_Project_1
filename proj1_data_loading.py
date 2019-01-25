@@ -14,8 +14,6 @@ class RedditComments:
 			It a list of data points, where each datapoint is a dictionary 
 			with the following attributes:
  			- popularity_score : a popularity score for this comment (based on the 
-			number of upvotes) (type: float)
- 			- children : the number of replies to this comment (type: int)
  			- text : the text of this comment (type: string)
  			- controversiality : a score for how "controversial" this comment is 
 			(automatically computed by Reddit)
