@@ -112,6 +112,47 @@ class RedditComments:
         
         return commonalities
     
+    def profanity(self, swords):
+        for point in swords:
+            point['text'] = point['text'].lower()
+            point['text'] = nltk.word_tokenize(point['text'])
+    
+    
+        badwords = """apeshit ass assfuck asshole assbag assbandit assbang 
+                assbanged assbanger assbangs assbite assclown asscock
+                asscracker asses assface assfaces assfuck assfucker ass-fucker 
+                assfukka asshat asshead asshole assholes asslick asslicker
+                beotch biatch bitch bitchtit bitchass bitched bitches bitchin 
+                bitching bitchtits bitchy hell bullshit bullshits bullshitted 
+                buttfuck buttfucker cock cockmunch cockmuncher cocks cocksuck 
+                cocksucked cocksucker cock-sucker cocksuckers cocksucking 
+                cocksucks cunt cuntbag dammit damn damned damnit dick dickbag 
+                dickface dickhead dickheads dickhole dickish dicks dipshit dong 
+                dumass dumbass dumbasses Dumbcunt dumbfuck dumbshit dumshit 
+                fatass fcuk fcuker fcuking fuc fuck fuckass fuck-ass fuckbag 
+                fuckboy fucked fucked up fucker fuckers fuckface fuckhead 
+                fuckheads fuckhole fuckin fucking fuckings fucks godamn godamnit 
+                goddam god-dam goddammit goddamn goddamned god-damned goddamnit 
+                ho hoe jackass jackasses mother fucker motherfucked motherfucker 
+                motherfuckers motherfuckin motherfucking motherfuckings motherfucks 
+                punkass pussies pussy pussys sex sexy shit shitface shithead 
+                shitheads shithole shiting shitings shits slut sluts smartass 
+                smartasses whore whores whoring"""
+    
+        badwords = nltk.word_tokenize(badwords)
+        badwordscount = [0]*12000
+        ind = 0
+    
+        for point in swords:
+            text = point['text']
+            for word1 in text:
+                for word2 in badwords:
+                    if word1 == word2:
+                        badwordscount[ind] += 1
+            ind += 1
+        
+        return badwordscount
+    
     def freq_dist(self, comments):
         """
             Calculates frequencies of words in the text values of the given
@@ -210,6 +251,8 @@ if __name__ == "__main__":
     redcoms.load()
     kfeatures = RedditComments()
     kfeatures.load()
+    sfeatures = RedditComments()
+    sfeatures.load()
     
     #redcoms.example()
     
@@ -221,6 +264,7 @@ if __name__ == "__main__":
     # Find most frequent words in text
     commonalities = redcoms.freq_dist(text_train)
     keywords = kfeatures.stopword_clean(kfeatures.data)
+    swearwords = sfeatures.profanity(sfeatures.data)
 
     w_train = redcoms.closed_form(X_train, y_train)
     print("Closed form weights: {}".format(w_train))
@@ -231,48 +275,7 @@ if __name__ == "__main__":
 
 ##############################################################################################
 
-    sfeatures = RedditComments()
-    sfeatures.load()
-    swords = sfeatures.data
-    
-    for point in swords:
-        point['text'] = point['text'].lower()
-        point['text'] = nltk.word_tokenize(point['text'])
     
     
-    badwords = """apeshit ass assfuck asshole assbag assbandit assbang 
-                assbanged assbanger assbangs assbite assclown asscock
-                asscracker asses assface assfaces assfuck assfucker ass-fucker 
-                assfukka asshat asshead asshole assholes asslick asslicker
-                beotch biatch bitch bitchtit bitchass bitched bitches bitchin 
-                bitching bitchtits bitchy hell bullshit bullshits bullshitted 
-                buttfuck buttfucker cock cockmunch cockmuncher cocks cocksuck 
-                cocksucked cocksucker cock-sucker cocksuckers cocksucking 
-                cocksucks cunt cuntbag dammit damn damned damnit dick dickbag 
-                dickface dickhead dickheads dickhole dickish dicks dipshit dong 
-                dumass dumbass dumbasses Dumbcunt dumbfuck dumbshit dumshit 
-                fatass fcuk fcuker fcuking fuc fuck fuckass fuck-ass fuckbag 
-                fuckboy fucked fucked up fucker fuckers fuckface fuckhead 
-                fuckheads fuckhole fuckin fucking fuckings fucks godamn godamnit 
-                goddam god-dam goddammit goddamn goddamned god-damned goddamnit 
-                ho hoe jackass jackasses mother fucker motherfucked motherfucker 
-                motherfuckers motherfuckin motherfucking motherfuckings motherfucks 
-                punkass pussies pussy pussys sex sexy shit shitface shithead 
-                shitheads shithole shiting shitings shits slut sluts smartass 
-                smartasses whore whores whoring"""
-    
-    badwords = nltk.word_tokenize(badwords)
-    
-    
-<<<<<<< HEAD
-    
-    
-    
-    
-    
-    
-    
-    
-    
-=======
->>>>>>> 5263b6a927663f1cdceef2094446556d037753a1
+                
+                
