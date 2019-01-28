@@ -10,8 +10,9 @@ from nltk.corpus import stopwords
 
 class RedditComments:
     
-    def __init__(self):
+    def __init__(self, name):
         self.data = None
+        self.myname = name
 
     def load(self):
         """ 
@@ -275,7 +276,7 @@ class RedditComments:
         """
         zero_arr = np.zeros([X_train.shape[0], 1])
         X_train = np.append(X_train, zero_arr, axis=0)
-        X_train[-1, :] = redcoms.profanity(text_train)
+        X_train[-1, :] = self.profanity(text_train)
         return X_train
     
     def get_mse(self, X_data, Y_data, w):
@@ -406,27 +407,27 @@ class RedditComments:
         if ( text_features == True ):
             #Cannot use text features with closed form. If attempted, will perform it with most_common_count
             if(closed_form == False):
-                commonalities = redcoms.stopword_clean(text_train)
-                X_train = redcoms.append_commonalities(commonalities, X_train)
+                commonalities = self.stopword_clean(text_train)
+                X_train = self.append_commonalities(commonalities, X_train)
             else:
                 #must use common word count with this to avoid singular matrix. Make sure to use the count with the validation. 
-                common_counts = redcoms.common_count(text_train)
+                common_counts = self.common_count(text_train)
                 X_train = np.append(X_train, common_counts, axis=1)
         if(common_word_count == True):
-                common_counts = redcoms.common_count(text_train)
+                common_counts = self.common_count(text_train)
                 X_train = np.append(X_train, common_counts, axis=1)
         if (swear_words == True):
-            swear_count = np.array(redcoms.profanity(text_train))
+            swear_count = np.array(self.profanity(text_train))
             swear_count = np.reshape(swear_count, [X_train.shape[0], 1])
             X_train = np.append(X_train, swear_count, axis=1)
         if(size_comment==True):
-            size_comments = redcoms.size_comment(text_train)
+            size_comments = self.size_comment(text_train)
             X_train = np.append(X_train, size_comments, axis=1)
             
            
         if (closed_form == True):
-            c_w = redcoms.closed_form(X_train, y_train)
-            c_mean_squared_error, c_train_squared_error_array = redcoms.get_mse(X_train, y_train, c_w)
+            c_w = self.closed_form(X_train, y_train)
+            c_mean_squared_error, c_train_squared_error_array = self.get_mse(X_train, y_train, c_w)
            # c_valid_mean_squared_error, c_valid_squared_error_array = redcoms.get_mse(X_val, y_val, c_w)
             print("Closed form mean training squared error: " + str(c_mean_squared_error))
             return c_w, c_mean_squared_error, X_train
@@ -434,9 +435,9 @@ class RedditComments:
         else:
            args = kwargs['args'] 
            w0 = np.zeros([X_train.shape[1]])
-           b = [args.beta] * args.maxiters
-           sgd_w = redcoms.gradient_descent(X_train, y_train, w0, b, args.n0, args.epsilon, args.maxiters)
-           sgd_mean_squared_error, sgd_train_squared_error_array = redcoms.get_mse(X_train, y_train, sgd_w)
+           b = [args['beta']] * args['maxiters']
+           sgd_w = self.gradient_descent(X_train, y_train, w0, b, args['n0'], args['epsilon'], args['maxiters'])
+           sgd_mean_squared_error, sgd_train_squared_error_array = self.get_mse(X_train, y_train, sgd_w)
            print("SGD mean training squared error: " + str(sgd_mean_squared_error[0]))
            return sgd_w, sgd_mean_squared_error, X_train
     
@@ -455,20 +456,20 @@ class RedditComments:
         """
         if ( text_features == True ):
              if(closed_form == False):
-                 commonalities = redcoms.stopword_clean(text_val)
-                 X = redcoms.append_commonalities(commonalities, X)
+                 commonalities = self.stopword_clean(text_val)
+                 X = self.append_commonalities(commonalities, X)
              else:
-                 common_counts = redcoms.common_count(text_val)
+                 common_counts = self.common_count(text_val)
                  X  = np.append(X, common_counts, axis=1)
         if(common_word_count == True):
-               common_counts = redcoms.common_count(text_val)
+               common_counts = self.common_count(text_val)
                X = np.append(X, common_counts, axis=1)      
         if (swear_words == True):
-            swear_count = np.array(redcoms.profanity(text_val))
+            swear_count = np.array(self.profanity(text_val))
             swear_count = np.reshape(swear_count, [X.shape[0], 1])
             X = np.append(X, swear_count, axis=1)
         if (size_comment==True):
-            size_comments = redcoms.size_comment(text_val)
+            size_comments = self.size_comment(text_val)
             X = np.append(X, size_comments, axis=1)
         return X
 
@@ -478,14 +479,19 @@ if __name__ == "__main__":
     ###################################################################################
     # Parse the arguments, if any, to use for training (if not specified, resort to 
     # defaults)
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--n0", help="hyperparameter in gradient descent, controls initial learning rate", default=1e-5)
-    parser.add_argument("--beta", help="hyperparamter in gradient descent, controls speed of the decay", default=1e-4)
-    parser.add_argument("--epsilon", help="error bound for gradient descent", default=1e-6)
-    parser.add_argument("--maxiters", help="max iteration number for gradient descent", default=10)
-    args = parser.parse_args()
+#    parser = argparse.ArgumentParser()
+#    parser.add_argument("--n0", help="hyperparameter in gradient descent, controls initial learning rate", default=1e-5)
+#    parser.add_argument("--beta", help="hyperparamter in gradient descent, controls speed of the decay", default=1e-4)
+#    parser.add_argument("--epsilon", help="error bound for gradient descent", default=1e-6)
+#    parser.add_argument("--maxiters", help="max iteration number for gradient descent", default=10)
+#    args = parser.parse_args()
     ###################################################################################
-
+    args = {
+            'n0':1e-5,
+            'beta':1e-4,
+            'epsilon':1e-6,
+            'maxiters':10
+            }
     # Create object to load comments, perform linear regression
     redcoms = RedditComments()
     redcoms.load()
