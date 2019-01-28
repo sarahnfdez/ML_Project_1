@@ -76,12 +76,12 @@ class RedditComments:
         
         """
         newd = comments
-        for point in newd:
-            point['text'] = point['text'].lower()
+#        for point in newd:
+#            point['text'] = point['text'].lower()
         
         words = []
         for point in newd:
-            text = nltk.word_tokenize(point['text'])
+            text = point['text']
             for word in text:
                 words.append(word)
         
@@ -102,7 +102,7 @@ class RedditComments:
         for point in newd:
             xcounts = [0]*160
             ind = 0
-            text = nltk.word_tokenize(point['text'])
+            text = point['text']
             for word1 in most_common:
                 for word2 in text:
                     if word2 == word1:
@@ -113,11 +113,7 @@ class RedditComments:
         return commonalities
     
     def profanity(self, swords):
-        for point in swords:
-            point['text'] = point['text'].lower()
-            point['text'] = nltk.word_tokenize(point['text'])
-    
-    
+   
         badwords = """apeshit ass assfuck asshole assbag assbandit assbang 
                 assbanged assbanger assbangs assbite assclown asscock
                 asscracker asses assface assfaces assfuck assfucker ass-fucker 
@@ -140,7 +136,7 @@ class RedditComments:
                 smartasses whore whores whoring"""
     
         badwords = nltk.word_tokenize(badwords)
-        badwordscount = [0]*12000
+        badwordscount = [0]*len(swords)
         ind = 0
     
         for point in swords:
@@ -188,7 +184,34 @@ class RedditComments:
                 ind += 1
             commonalities.append(xcounts)
         return commonalities
-
+   
+    def most_common(self, comments):
+        """
+        finds the most common words with their word count from the list of comments
+        """
+        words = []
+        for point in comments:
+            text = point['text']
+            for word in text:
+                words.append(word)
+    
+        most_comm = collections.Counter(words).most_common(160)
+        most_common = []
+        count = []
+        for tup in most_comm:
+            word = tup[0]
+            counter = tup[1]
+                
+            most_common.append(word)
+            count.append(counter)
+        word_list = np.array(most_common)
+        count = np.array(count)
+        word_list = np.reshape(word_list, [len(word_list), 1])
+        count = np.reshape(count, [len(word_list), 1])
+        word_list = np.append(word_list, count, axis=1)
+        word_list = np.reshape(word_list, [len(count), 2])
+        return word_list
+                
     def closed_form(self, X, y):
         """
             Implements the closed-form solution w = (X^T X)^-1 X^T y, where X is
@@ -221,17 +244,234 @@ class RedditComments:
         i = 1
         w = [0] * maxiters
         w[0] = w0
+        XT = X.transpose()
+        XTdotX = XT.dot(X)
+        Xtdoty = XT.dot(y)
         while True:
             if i == maxiters:
                 i -= 1
                 break
             alpha = n0 /(1 + beta[i])
-            XT = X.transpose()
-            w[i] = w[i-1] - (2 * alpha * (XT.dot(X).dot(w[i-1]) - XT.dot(y)))
+            w[i] = w[i-1] - (2 * alpha * (XTdotX.dot(w[i-1]) - Xtdoty))
             if np.linalg.norm(w[i] - w[i-1], ord=2) <= epsilon:
                 break
+
+            
             i += 1
         return w[i]
+    
+    def append_commonalities(self, commonalities, X_train):
+        """
+        input: x_train array without text data, and the text data we wish to append. 
+        output: x_train data with text data
+        """
+        commonalities_arr = np.array(commonalities)
+        x_train_commonalities = np.append(X_train, commonalities, axis=1)
+        return x_train_commonalities
+    def append_swear_count(self, X_train, text_train):
+        """
+        input: x_train array without text data, and the swear count we wish to append. 
+        output: x_train data with text data
+        """
+        zero_arr = np.zeros([X_train.shape[0], 1])
+        X_train = np.append(X_train, zero_arr, axis=0)
+        X_train[-1, :] = redcoms.profanity(text_train)
+        return X_train
+    
+    def get_mse(self, X_data, Y_data, w):
+       """
+       input: 
+           X_data: the data containing all the features we are looking at for all the instances
+           Y_data: the true value of the output for each instance.
+           weights: The weights calulated according to gradient descent or closed form solution matchin
+                    the x_data to the y_data
+                    
+       output:
+           mean_squared_error: predicts the y value for each x instance, compares to real y value and finds mean squared error between them.
+       """
+       num_instances = len(Y_data)
+       i = 0;
+       prediction_array = np.array(Y_data)
+       
+       ## find predicted value for each instance and store in array prediction_array
+       for instance in X_data:
+           j = 0;
+           prediction = 0
+           for feature in instance:
+               prediction += feature*w[j]
+               j += 1
+           prediction_array[i] = prediction[0]
+           i +=1;
+       
+       mean_squared_error = 0
+       # goes through each prediction to compare with try y value.
+       squared_error_array = [pow(prediction_array[i] - Y_data[i], 2) for i in range(num_instances)]
+       squared_error_array = np.array(squared_error_array)
+       for instance in squared_error_array:
+           mean_squared_error += instance
+       mean_squared_error = mean_squared_error/num_instances
+       return mean_squared_error, squared_error_array;
+   
+    def size_comment(self, text):
+        """
+        returns a numpy array where each entry corresponds to the size of the comment it represents
+            
+        """
+        comments = text
+        comment_arr = np.zeros([len(text), 1])
+        i = 0
+        for comment in comments:
+            this_comment = comment['text']
+            size_comment = len(this_comment)
+            comment_arr[i] = size_comment
+            i+=1
+        maximum = max(comment_arr)
+        mean = np.mean(comment_arr)
+        comment_arr = [-pow((comment_arr[i]-mean)/mean, 1) for i in range(len(comment_arr))]
+        
+        return comment_arr
+    
+    def common_count(self, comments):
+        """ 
+        goes through all the the comments, and creates an array that contains the number of most common words 
+        in that comment
+        
+        """
+        
+        #############CALCULATE MOST COMMON WORDS WITHOUT STOP WORDS
+        words = []
+        for point in comments:
+            text = point['text']
+            for word in text:
+                words.append(word)
+        
+        stop = stopwords.words('english')+list(string.punctuation)
+        filtered_comments = []
+        for w in words:
+            if w not in stop:
+                filtered_comments.append(w)        
+        
+        most_comm = collections.Counter(filtered_comments).most_common(171)
+        most_common = []
+        for tup in most_comm:
+            word = tup[0]
+            most_common.append(word)
+        most_common = most_common[11:]
+        
+        count_arr = np.zeros([len(comments), 1])
+        i = 0
+        for comment in comments:
+            count = 0
+            comment_text = comment['text']
+            for word in comment_text: 
+                for common_word in most_common:
+                    if (word==common_word):
+                        count+=1
+            count_arr[i] = count
+            i+=1
+        max_value = max(count_arr)
+        return count_arr/max_value
+                
+                
+    
+    def run_regression(self, closed_form, text_features , swear_words, size_comment, common_word_count, **kwargs):
+        """
+        Runs linear regression according to the parameters above.
+        
+        Input:
+            closed_form: boolean - if true, runs closed_form regression. 
+            
+            text_features: if true, appends text features to the regression.
+            
+             swear_words: if true, adds the swear_words to the regression features
+            
+            size_comments: appends the size of the comment feature.
+            
+            kwargs:
+                
+      
+                X, y : training and target data.
+                
+                args: arguments for regression, if they are being used.
+                
+                text: text features to append if needed.
+        Output: 
+            returns weights, mean_squared_error
+            
+        """
+        X_train = kwargs['X']
+        y_train = kwargs['y']
+        text_train = kwargs['text']
+        #evaluate closed form regression
+        if ( text_features == True ):
+            #Cannot use text features with closed form. If attempted, will perform it with most_common_count
+            if(closed_form == False):
+                commonalities = redcoms.stopword_clean(text_train)
+                X_train = redcoms.append_commonalities(commonalities, X_train)
+            else:
+                #must use common word count with this to avoid singular matrix. Make sure to use the count with the validation. 
+                common_counts = redcoms.common_count(text_train)
+                X_train = np.append(X_train, common_counts, axis=1)
+        if(common_word_count == True):
+                common_counts = redcoms.common_count(text_train)
+                X_train = np.append(X_train, common_counts, axis=1)
+        if (swear_words == True):
+            swear_count = np.array(redcoms.profanity(text_train))
+            swear_count = np.reshape(swear_count, [X_train.shape[0], 1])
+            X_train = np.append(X_train, swear_count, axis=1)
+        if(size_comment==True):
+            size_comments = redcoms.size_comment(text_train)
+            X_train = np.append(X_train, size_comments, axis=1)
+            
+           
+        if (closed_form == True):
+            c_w = redcoms.closed_form(X_train, y_train)
+            c_mean_squared_error, c_train_squared_error_array = redcoms.get_mse(X_train, y_train, c_w)
+           # c_valid_mean_squared_error, c_valid_squared_error_array = redcoms.get_mse(X_val, y_val, c_w)
+            print("Closed form mean training squared error: " + str(c_mean_squared_error))
+            return c_w, c_mean_squared_error, X_train
+         #evaluate sgd regression
+        else:
+           args = kwargs['args'] 
+           w0 = np.zeros([X_train.shape[1]])
+           b = [args.beta] * args.maxiters
+           sgd_w = redcoms.gradient_descent(X_train, y_train, w0, b, args.n0, args.epsilon, args.maxiters)
+           sgd_mean_squared_error, sgd_train_squared_error_array = redcoms.get_mse(X_train, y_train, sgd_w)
+           print("SGD mean training squared error: " + str(sgd_mean_squared_error[0]))
+           return sgd_w, sgd_mean_squared_error, X_train
+    
+    def add_features(self, X, text_val, closed_form, text_features, swear_words, size_comment, common_word_count ):
+        """
+        Adds features to the X data if we added them in training. 
+            Input:
+                X data to which you want to add features
+                Text data 
+                Boolean:
+                    text_features
+                    swear_words
+                    size_words
+            Output:
+                modified X data
+        """
+        if ( text_features == True ):
+             if(closed_form == False):
+                 commonalities = redcoms.stopword_clean(text_val)
+                 X = redcoms.append_commonalities(commonalities, X)
+             else:
+                 common_counts = redcoms.common_count(text_val)
+                 X  = np.append(X, common_counts, axis=1)
+        if(common_word_count == True):
+               common_counts = redcoms.common_count(text_val)
+               X = np.append(X, common_counts, axis=1)      
+        if (swear_words == True):
+            swear_count = np.array(redcoms.profanity(text_val))
+            swear_count = np.reshape(swear_count, [X.shape[0], 1])
+            X = np.append(X, swear_count, axis=1)
+        if (size_comment==True):
+            size_comments = redcoms.size_comment(text_val)
+            X = np.append(X, size_comments, axis=1)
+        return X
+
 
 if __name__ == "__main__":
 
@@ -249,33 +489,37 @@ if __name__ == "__main__":
     # Create object to load comments, perform linear regression
     redcoms = RedditComments()
     redcoms.load()
-    kfeatures = RedditComments()
-    kfeatures.load()
-    sfeatures = RedditComments()
-    sfeatures.load()
-    
-    #redcoms.example()
+
     
     # Preprocess text, inputs into integers to be formatted into data matrix
     text_train, X_train, y_train = redcoms.preprocess(redcoms.data[:10000])
     text_val, X_val, y_val = redcoms.preprocess(redcoms.data[10000:11000])
     text_test, X_test, y_test = redcoms.preprocess(redcoms.data[11000:12000])
 
-    # Find most frequent words in text
-    commonalities = redcoms.freq_dist(text_train)
-    keywords = kfeatures.stopword_clean(kfeatures.data)
-    swearwords = sfeatures.profanity(sfeatures.data)
-
-    w_train = redcoms.closed_form(X_train, y_train)
-    print("Closed form weights: {}".format(w_train))
-    w0 = np.array([[0],[0],[0],[0]])
-    b = [args.beta] * args.maxiters
-    w_train = redcoms.gradient_descent(X_train, y_train, w0, b, args.n0, args.epsilon, args.maxiters)
-    print("Gradient descent weights: {}".format(w_train))
+    # Find most frequent words in text and save to zip file
+#    most_common_words = redcoms.most_common(text_train)
+#    file = open('words.txt','w') 
+#    for word_count in most_common_words:
+#        file.write(word_count[0].ljust(10) + "\t" + word_count[1] + "\n")          
+#    file.close() 
+    
+   # keywords = kfeatures.stopword_clean(kfeatures.data)
+   # swearwords = sfeatures.profanity(sfeatures.data)
+    
+   
 
 ##############################################################################################
 
     
+################################### task 3 - ealuate data ####################################
+        
+    # No text Features.        
     
-                
-                
+    weights, error, X_train = redcoms.run_regression( closed_form=False, text_features=False, swear_words=True, size_comment=True,common_word_count=True, X=X_train, y=y_train, text=text_train, args=args )    
+    X_val = redcoms.add_features(X_val, text_val, closed_form=False, text_features=False, swear_words=True, size_comment=True,common_word_count=True);
+    mse, squared_error_array = redcoms.get_mse(X_val, y_val, weights)
+    print("Closed Form mean valid squared error:    " + str(mse[0]));
+
+    #With Text Features
+    #SGD
+    
