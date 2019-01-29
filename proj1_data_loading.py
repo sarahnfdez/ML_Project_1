@@ -255,7 +255,7 @@ if __name__ == "__main__":
     sfeatures.load()
     
     #redcoms.example()
-    
+    print(len(redcoms.data))
     # Preprocess text, inputs into integers to be formatted into data matrix
     text_train, X_train, y_train = redcoms.preprocess(redcoms.data[:10000])
     text_val, X_val, y_val = redcoms.preprocess(redcoms.data[10000:11000])
@@ -274,8 +274,7 @@ if __name__ == "__main__":
     print("Gradient descent weights: {}".format(w_train))
 
 ##############################################################################################
-
-    
+        
     
                 
                 
