@@ -5,6 +5,7 @@ import collections
 import numpy as np
 import argparse
 import string
+import time
 import nltk
 from nltk.corpus import stopwords
 
@@ -94,8 +95,11 @@ class RedditComments:
         
         most_comm = collections.Counter(filtered_comments).most_common(171)
         most_common = []
+        max_count = 0 #the maximum number of these 
         for tup in most_comm:
             word = tup[0]
+            if (tup[1] > max_count):
+                max_count = tup[1]
             most_common.append(word)
         most_common = most_common[11:]
         
@@ -108,8 +112,22 @@ class RedditComments:
                 for word2 in text:
                     if word2 == word1:
                         xcounts[ind] += 1
+                xcounts[ind] = xcounts[ind]
                 ind += 1
             commonalities.append(xcounts)
+        
+         #scale array
+        d_commonalities = np.reshape(commonalities, len(commonalities)*len(commonalities[0]) )
+        maximum = np.max(d_commonalities)
+        minimum = np.min(d_commonalities)
+        i = 0
+        for row in commonalities:
+            j = 0
+            for column in row:
+                commonalities[i][j] = 6*(column - minimum)/(maximum - minimum)
+                j+=1
+            i+=1
+        
         
         return commonalities
     
@@ -167,13 +185,17 @@ class RedditComments:
 
         most_comm = collections.Counter(words).most_common(160)
         most_common = []
+        max_count = 0
         for tup in most_comm:
             word = tup[0]
+            if(tup[1] > max_count):
+                max_count = tup[1]
             most_common.append(word)
         commonalities = []
 
         # Creates a 160-dim array for every comment whose values are the number of
         # times the frequent words are used
+        
         for point in comments:
             xcounts = [0]*160
             ind = 0
@@ -182,8 +204,25 @@ class RedditComments:
                 for word2 in text:
                     if word2 == word1:
                         xcounts[ind] += 1
+                xcounts[ind] = xcounts[ind]
                 ind += 1
             commonalities.append(xcounts)
+        
+        #scale array
+        d_commonalities = np.reshape(commonalities, len(commonalities)*len(commonalities[0]) )
+        maximum = np.max(d_commonalities)
+        minimum = np.min(d_commonalities)
+        i = 0
+        for row in commonalities:
+            j = 0
+            for column in row:
+                commonalities[i][j] = 6*(column - minimum)/(maximum - minimum)
+                j+=1
+            i+=1
+            
+            
+        
+
         return commonalities
    
     def most_common(self, comments):
@@ -371,7 +410,7 @@ class RedditComments:
             count_arr[i] = count
             i+=1
         max_value = max(count_arr)
-        return count_arr/max_value
+        return 10*count_arr/max_value 
                 
                 
     
@@ -388,6 +427,7 @@ class RedditComments:
             
             size_comments: appends the size of the comment feature.
             
+            common_word_count: appends the number of text_features exist in each comment, to each comment
             kwargs:
                 
       
@@ -400,6 +440,7 @@ class RedditComments:
             returns weights, mean_squared_error
             
         """
+        time_start = time.time() #gives the current time in seconds since the start of 1970
         X_train = kwargs['X']
         y_train = kwargs['y']
         text_train = kwargs['text']
@@ -429,8 +470,12 @@ class RedditComments:
             c_w = self.closed_form(X_train, y_train)
             c_mean_squared_error, c_train_squared_error_array = self.get_mse(X_train, y_train, c_w)
            # c_valid_mean_squared_error, c_valid_squared_error_array = redcoms.get_mse(X_val, y_val, c_w)
+            time_end = time.time()
+            training_time = time_end - time_start
+            print("Closed form training time: " + str(training_time))
             print("Closed form mean training squared error: " + str(c_mean_squared_error))
-            return c_w, c_mean_squared_error, X_train
+            
+            return c_w, c_mean_squared_error, X_train, training_time
          #evaluate sgd regression
         else:
            args = kwargs['args'] 
@@ -438,8 +483,12 @@ class RedditComments:
            b = [args['beta']] * args['maxiters']
            sgd_w = self.gradient_descent(X_train, y_train, w0, b, args['n0'], args['epsilon'], args['maxiters'])
            sgd_mean_squared_error, sgd_train_squared_error_array = self.get_mse(X_train, y_train, sgd_w)
+           time_end = time.time()
+           training_time = time_end - time_start
+           print("SGD  training time: " + str(training_time))
            print("SGD mean training squared error: " + str(sgd_mean_squared_error[0]))
-           return sgd_w, sgd_mean_squared_error, X_train
+           
+           return sgd_w, sgd_mean_squared_error, X_train, time_end - time_start
     
     def add_features(self, X, text_val, closed_form, text_features, swear_words, size_comment, common_word_count ):
         """
@@ -489,8 +538,8 @@ if __name__ == "__main__":
     args = {
     'n0':1e-5,
     'beta':1e-4,
-    'epsilon':1e-6,
-    'maxiters':10
+    'epsilon':1e-9,
+    'maxiters':100
     }
     # Create object to load comments, perform linear regression
     redcoms = RedditComments()
@@ -521,10 +570,10 @@ if __name__ == "__main__":
     
     # No text Features.        
     
-    weights, error, X_train = redcoms.run_regression( closed_form=False, text_features=False, swear_words=True, size_comment=True,common_word_count=True, X=X_train, y=y_train, text=text_train, args=args )    
-    X_val = redcoms.add_features(X_val, text_val, closed_form=False, text_features=False, swear_words=True, size_comment=True,common_word_count=True);
+    weights, error, X_train, training_time = redcoms.run_regression( closed_form=False, text_features=True, swear_words=False, size_comment=False, common_word_count=False, X=X_train, y=y_train, text=text_train, args=args )    
+    X_val = redcoms.add_features(X_val, text_val, closed_form=False, text_features=True, swear_words=False, size_comment=False,common_word_count=False);
     mse, squared_error_array = redcoms.get_mse(X_val, y_val, weights)
-    print("Closed Form mean valid squared error:    " + str(mse[0]));
+    print("SGD validation mean squared error:    " + str(mse[0]));
     
     #With Text Features
     #SGD
