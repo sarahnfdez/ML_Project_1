@@ -33,22 +33,25 @@
 \end{abstract}
 
 \section{Introduction}
-
+ Tom Mitchell, a machine learning researcher at Carnegie Mellon University, defines the learning problem as follows: a computer program is set to learn from an experience E with respect to some task T and some performance measure P if
+ its performance on T as measured by P improves with experience E \cite{Mitchell}. In the case of predicting the popularity of a reddit comment given its features, the task is the prediction, the experience is the set of reddit comments it has seen with its features defined and its popularity scored, and the performance measure is the popularity ranking. The method of linear regression then seeks to learn the linear fit between the input variables or features and the output, existing in the real set of numbers \cite{Freedman}. The dataset used for this task is a collection of data points consisting of the features of each reddit comment followed by the text of that comment, and its fixed popularity ranking. This task is defined as supervised learning, since the popularity score is given with each reddit comment and it doesn't have to be learned through other means \cite{Russell}. We propose using the method of linear regression and gradient descent, an optimization function that retrieves the minimum of a given function \cite{Barzilai}, to predict the popularity of reddit comments.
 
 \section{Dataset}
-
+The dataset is provided as a JSON encoded set of datapoints, each one containing the following information: children, which counts how many replies the comment received; controversy, which is a Reddit-defined metric of how controversial a comment is in the range \{0,1\}; is\_root, a binary variable indicating if the comment was the start of a chain or not; text, the raw text of the comment; and popularity\_score, a real-valued integer. There are approximately 12,000 datapoints in the set. Since it was gathered from a public, semi-anonymous forum, it contains profanity, potentially offensive content, and extremely personal anecdotes.
 
 \section{Results}
 
 
-\subsection{Discussion and Conclusion}
+\section{Discussion and Conclusion}
 
 
-\subsection{Statement of Contribution}
+We have shown that the popularity ranking of reddit comments can be reasonably predicted through learning a linearly weighted function on its features, and that the function is well-fit to the general data.
+
+\section{Statement of Contribution}
 
 
-\bibliography{naaclhlt2016}
-\bibliographystyle{naaclhlt2016}
+\bibliography{Project1WriteUp}
+\bibliographystyle{Project1WriteUp}
 
 
 \end{document}
