@@ -130,7 +130,43 @@ class RedditComments:
         
         
         return commonalities
+    def disc_profanity(self, swords):
+   
+        badwords = """apeshit ass assfuck asshole assbag assbandit assbang 
+                assbanged assbanger assbangs assbite assclown asscock
+                asscracker asses assface assfaces assfuck assfucker ass-fucker 
+                assfukka asshat asshead asshole assholes asslick asslicker
+                beotch biatch bitch bitchtit bitchass bitched bitches bitchin 
+                bitching bitchtits bitchy hell bullshit bullshits bullshitted 
+                buttfuck buttfucker cock cockmunch cockmuncher cocks cocksuck 
+                cocksucked cocksucker cock-sucker cocksuckers cocksucking 
+                cocksucks cunt cuntbag dammit damn damned damnit dick dickbag 
+                dickface dickhead dickheads dickhole dickish dicks dipshit dong 
+                dumass dumbass dumbasses Dumbcunt dumbfuck dumbshit dumshit 
+                fatass fcuk fcuker fcuking fuc fuck fuckass fuck-ass fuckbag 
+                fuckboy fucked fucked up fucker fuckers fuckface fuckhead 
+                fuckheads fuckhole fuckin fucking fuckings fucks godamn godamnit 
+                goddam god-dam goddammit goddamn goddamned god-damned goddamnit 
+                ho hoe jackass jackasses mother fucker motherfucked motherfucker 
+                motherfuckers motherfuckin motherfucking motherfuckings motherfucks 
+                punkass pussies pussy pussys sex sexy shit shitface shithead 
+                shitheads shithole shiting shitings shits slut sluts smartass 
+                smartasses whore whores whoring"""
     
+        badwords = nltk.word_tokenize(badwords)
+        badwordscount = [0]*len(swords)
+        ind = 0
+    
+        for point in swords:
+            text = point['text']
+            for word1 in text:
+                for word2 in badwords:
+                    if word1 == word2:
+                        badwordscount[ind] = 1
+                        break
+            ind += 1
+        
+        return badwordscount
     def profanity(self, swords):
    
         badwords = """apeshit ass assfuck asshole assbag assbandit assbang 
@@ -298,7 +334,8 @@ class RedditComments:
 
             
             i += 1
-        return w[i]
+        ret = w[i]
+        return ret
     
     def append_commonalities(self, commonalities, X_train):
         """
@@ -318,7 +355,7 @@ class RedditComments:
         X_train[-1, :] = self.profanity(text_train)
         return X_train
     
-    def get_mse(self, X_data, Y_data, w):
+    def get_mse_crossv(self, X_data, Y_data, w):
        """
        input: 
            X_data: the data containing all the features we are looking at for all the instances
@@ -331,7 +368,7 @@ class RedditComments:
        """
        num_instances = len(Y_data)
        i = 0;
-       prediction_array = np.array(Y_data)
+       prediction_array = np.zeros(len(Y_data))
        
        ## find predicted value for each instance and store in array prediction_array
        for instance in X_data:
@@ -340,12 +377,12 @@ class RedditComments:
            for feature in instance:
                prediction += feature*w[j]
                j += 1
-           prediction_array[i] = prediction[0]
+           prediction_array[i] = prediction
            i +=1;
        
        mean_squared_error = 0
        # goes through each prediction to compare with try y value.
-       squared_error_array = [pow(prediction_array[i] - Y_data[i], 2) for i in range(num_instances)]
+       squared_error_array = [pow(prediction_array[i] - Y_data[i], 2)[0] for i in range(num_instances)]
        squared_error_array = np.array(squared_error_array)
        for instance in squared_error_array:
            mean_squared_error += instance
@@ -490,6 +527,40 @@ class RedditComments:
            
            return sgd_w, sgd_mean_squared_error, X_train, time_end - time_start
     
+    def get_mse(self, X_data, Y_data, w):
+       """
+       input: 
+           X_data: the data containing all the features we are looking at for all the instances
+           Y_data: the true value of the output for each instance.
+           weights: The weights calulated according to gradient descent or closed form solution matchin
+                    the x_data to the y_data
+                    
+       output:
+           mean_squared_error: predicts the y value for each x instance, compares to real y value and finds mean squared error between them.
+       """
+       num_instances = len(Y_data)
+       i = 0;
+       prediction_array = np.array(Y_data)
+       
+       ## find predicted value for each instance and store in array prediction_array
+       for instance in X_data:
+           j = 0;
+           prediction = 0
+           for feature in instance:
+               prediction += feature*w[j]
+               j += 1
+           prediction_array[i] = prediction[0]
+           i +=1;
+       
+       mean_squared_error = 0
+       # goes through each prediction to compare with try y value.
+       squared_error_array = [pow(prediction_array[i] - Y_data[i], 2) for i in range(num_instances)]
+       squared_error_array = np.array(squared_error_array)
+       for instance in squared_error_array:
+           mean_squared_error += instance
+       mean_squared_error = mean_squared_error/num_instances
+       return mean_squared_error, squared_error_array;
+   
     def add_features(self, X, text_val, closed_form, text_features, swear_words, size_comment, common_word_count ):
         """
         Adds features to the X data if we added them in training. 
@@ -521,6 +592,218 @@ class RedditComments:
             size_comments = self.size_comment(text_val)
             X = np.append(X, size_comments, axis=1)
         return X
+    def preprocess_features(self, data, **kwargs):
+        """
+            Preprocesses the data. Converts text to all lowercase, splits into tokens.
+            If any keyword args exist, preprocess the data according to them
+            
+
+            Input: data - data to preprocess (dict)
+                    kwargs - dictionary of booleans that determine any preprocessing we wish to do with the data
+            
+            Output: data - preprocessed data
+                    X - data matrix with bias (first column all 1s)
+                    y - output vector 
+        """
+        text_features = False
+        stop_words = False
+        most_common = 1
+        swear_words = False
+        discrete_swear_words = False
+        comment_length = False
+        binary_text = False
+        if 'text_features' in kwargs:
+            text_features = kwargs['text_features']
+            most_common_len = kwargs['most_common']
+        if text_features and 'stop_words' in kwargs:
+            stop_words = kwargs['stop_words']
+        
+        if 'swear_words' in kwargs:
+            swear_words = kwargs['swear_words']
+        if 'discrete_swear_words' in kwargs:
+            discrete_swear_words = kwargs['discrete_swear_words']
+            
+        if 'comment_length' in kwargs:
+            comment_length = kwargs['comment_length']
+        if 'binary_text' in kwargs:
+            binary_text = kwargs['binary_text']
+        
+       
+        ## word list for if we want text features
+        words = []
+       
+        for instance in data:
+            if not stop_words:
+                instance['text'] = instance['text'].lower().split()
+            else:
+                tokenizer = nltk.tokenize.TweetTokenizer()
+                instance['text'] = tokenizer.tokenize(instance['text'].lower())
+            if (stop_words): #if stop words is true, filter out the stop words from the comments 
+                stop_list = stopwords.words('english')+list(string.punctuation)
+                filtered_comments = []
+                for w in instance['text']:
+                    if w not in stop_list:
+                        filtered_comments.append(w)
+                instance['text'] = filtered_comments
+        
+                        
+            if text_features or binary_text:
+                #append word to words if we want text_features
+                for word in instance['text']:
+                    words.append(word)
+            if instance['is_root']:
+                instance['is_root'] = 1
+            else:
+                instance['is_root'] = 0
+        
+        if (text_features or binary_text):
+            #most_comm is a list of the most common words    
+            most_comm = collections.Counter(words).most_common(most_common_len)
+            dictionary =[ most_comm[i][0] for i in range(len(most_comm))]
+            commonalities =[]
+        if comment_length:
+            comment_length_arr = []
+        if (comment_length or text_features or binary_text):
+            for instance in data:
+                if text_features or binary_text:
+                    xcounts = [0]*most_common_len
+                    text = instance['text']
+                    index = 0
+                    for word1 in dictionary:
+                        for word2 in text:
+                            if word2 == word1:
+                                xcounts[index] += 1
+                        xcounts[index] = xcounts[index]
+                        index += 1
+                    commonalities.append(xcounts)
+                if comment_length:
+                    comment_length_instance = len(instance['text'])
+                    if comment_length_instance > 6:
+                        comment_length_arr.append(1)
+                    else: 
+                        comment_length_arr.append(0)
+#                    comment_length_arr.append(comment_length_instance)
+                    
+        if (text_features or binary_text):
+            commonalities = np.array(commonalities, dtype='float')
+            binary_commonalities = np.copy(commonalities)
+            #scale commonalities array
+            d_commonalities = np.reshape(commonalities, len(commonalities)*len(commonalities[0]) )
+            maximum = np.max(d_commonalities)
+            minimum = np.min(d_commonalities)
+            mean = np.mean(d_commonalities)
+            i = 0
+            for row in commonalities:
+                j = 0
+                for column in row:
+                    if binary_text:
+                        binary_commonalities[i][j] = 1 if binary_commonalities[i][j] >= 1 else 0
+                    else:
+                        commonalities[i][j] = 6*(column - minimum)/(maximum-minimum)# (2*(column - minimum)/(maximum - minimum) - 1)
+                    j+=1
+                i+=1
+    
+        # Creates data matrix X and output vector y
+
+        initial_point = data[0]
+        X = np.array([[1, initial_point['is_root'], initial_point['controversiality'], initial_point['children']]])
+        y = np.array([[initial_point['popularity_score']]])
+        for i in range(1, len(data)):
+            point = data[i]
+            X = np.concatenate((X, [[1, point['is_root'], point['controversiality'], point['children']]]), axis=0)
+            y = np.concatenate((y, [[point['popularity_score']]]), axis=0)
+        X = X.astype('float')
+        if text_features:
+            X = np.append(X, commonalities, axis=1)
+            
+        if binary_text:
+            X = np.append(X, binary_commonalities, axis=1)
+        
+        if swear_words:
+            swear_count = np.array(self.profanity(data))
+            swear_count = np.reshape(swear_count, [swear_count.shape[0], 1])
+            X = np.append(X, swear_count, axis=1)
+        if discrete_swear_words:
+            swear_count = np.array(self.disc_profanity(data))
+            swear_count = np.reshape(swear_count, [swear_count.shape[0], 1])
+            X = np.append(X, swear_count, axis=1)
+        if comment_length:
+            comment_length_arr = np.array(comment_length_arr)
+            comment_length_arr = np.reshape(comment_length_arr, [comment_length_arr.shape[0], 1])
+            X = np.append(X, comment_length_arr, axis=1)
+           
+        return data, X, y
+    def regress(self,closed_form, X_train, y_train, text, args):
+        """
+        Runs linear regression according to the parameters above.
+        
+        Input:
+                closed_form: boolean - if true, runs closed_form regression. 
+        
+                X, y : training and target data.
+                
+                args: arguments for regression, if they are being used.
+                
+                text: text features to append if needed.
+        Output: 
+                returns weights, mean_squared_error, and regression compute time
+            
+        """
+        time_start = time.time() #gives the current time in seconds since the start of 1970
+              
+        if (closed_form == True):  #evaluate closed form regression    
+            c_w = self.closed_form(X_train, y_train)
+            c_mean_squared_error, c_train_squared_error_array = self.get_mse(X_train, y_train, c_w)
+            time_end = time.time()
+            training_time = time_end - time_start            
+            return c_w, c_mean_squared_error, training_time
+        
+        else: #evaluate sgd regression 
+           w0 = np.zeros([X_train.shape[1]])
+           b = [args['beta']] * args['maxiters']
+           sgd_w = self.gradient_descent(X_train, y_train, w0, b, args['n0'], args['epsilon'], args['maxiters'])
+           sgd_mean_squared_error, sgd_train_squared_error_array = self.get_mse(X_train, y_train, sgd_w)
+           time_end = time.time()
+           training_time = time_end - time_start
+           
+           return sgd_w, sgd_mean_squared_error, time_end - time_start
+       
+     
+    def regress_crossv(self,closed_form, X_train, y_train, weights, text, args):
+        """
+        Runs linear regression according to the parameters above.
+        
+        Input:
+                closed_form: boolean - if true, runs closed_form regression. 
+        
+                X, y : training and target data.
+                
+                args: arguments for regression, if they are being used.
+                
+                text: text features to append if needed.
+        Output: 
+                returns weights, mean_squared_error, and regression compute time
+            
+        """
+        time_start = time.time() #gives the current time in seconds since the start of 1970
+              
+        if (closed_form == True):  #evaluate closed form regression    
+            c_w = self.closed_form(X_train, y_train)
+            c_mean_squared_error, c_train_squared_error_array = self.get_mse_crossv(X_train, y_train, c_w)
+            time_end = time.time()
+            training_time = time_end - time_start            
+            return c_w, c_mean_squared_error, training_time
+        
+        else: #evaluate sgd regression 
+           w0 = weights
+           b = [args['beta']] * args['maxiters']
+           sgd_w = self.gradient_descent(X_train, y_train, w0, b, args['n0'], args['epsilon'], args['maxiters'])
+           sgd_mean_squared_error, sgd_train_squared_error_array = self.get_mse_crossv(X_train, y_train, sgd_w)
+           time_end = time.time()
+           training_time = time_end - time_start
+           
+           return sgd_w, sgd_mean_squared_error, time_end - time_start
+ 
 
 
 if __name__ == "__main__":
@@ -537,7 +820,7 @@ if __name__ == "__main__":
     ###################################################################################
     args = {
     'n0':1e-5,
-    'beta':1e-4,
+    'beta':1e-5,
     'epsilon':1e-9,
     'maxiters':100
     }
@@ -545,36 +828,79 @@ if __name__ == "__main__":
     redcoms = RedditComments()
     redcoms.load()
     
+    k_fold_cross_validation = True
+    num_folds = 10
+    closed_form = False
+    text_features = True
+    most_common = 1
+    swear_words =False
+    stop_words =  True
+    discrete_swear_words = False
+    comment_length = False
+    binary_text = False
     
-    # Preprocess text, inputs into integers to be formatted into data matrix
-    text_train, X_train, y_train = redcoms.preprocess(redcoms.data[:10000])
-    text_val, X_val, y_val = redcoms.preprocess(redcoms.data[10000:11000])
-    text_test, X_test, y_test = redcoms.preprocess(redcoms.data[11000:12000])
-    
-    # Find most frequent words in text and save to zip file
-    #    most_common_words = redcoms.most_common(text_train)
-    #    file = open('words.txt','w') 
-    #    for word_count in most_common_words:
-    #        file.write(word_count[0].ljust(10) + "\t" + word_count[1] + "\n")          
-    #    file.close() 
-    
-       # keywords = kfeatures.stopword_clean(kfeatures.data)
-       # swearwords = sfeatures.profanity(sfeatures.data)
-    
+    if (not k_fold_cross_validation):
+        # Preprocess text, inputs into integers to be formatted into data matrix
+        text_train, X_train, y_train = redcoms.preprocess_features(redcoms.data[:10000], text_features=text_features, most_common=most_common, stop_words=stop_words, swear_words=swear_words, discrete_swear_words=discrete_swear_words, comment_length=comment_length, binary_text=binary_text)
+        text_val, X_val, y_val = redcoms.preprocess_features(redcoms.data[10000:11000], text_features=text_features, most_common=most_common, stop_words=stop_words,  swear_words=swear_words, discrete_swear_words=discrete_swear_words, comment_length=comment_length, binary_text=binary_text)
+        text_test, X_test, y_test = redcoms.preprocess_features(redcoms.data[11000:12000], text_features=text_features, most_common=most_common,stop_words=stop_words,  swear_words=swear_words, discrete_swear_words=discrete_swear_words, comment_length=comment_length, binary_text=binary_text)
+        
+            
+        
+        training_weights, training_error, training_time = redcoms.regress( closed_form, X_train, y_train, text_train, args )    
+        validation_error, squared_error_array = redcoms.get_mse(X_test, y_test, training_weights)
+        if closed_form:
+            print("Closed form training time:   " + str(training_time))
+            print("Closed form training mean squared error: " +  str(training_error[0]))
+            print("closed form validation mean squared error:    " + str(validation_error));
+        else:
+            print("SGD training time:   " + str(training_time))
+            print("SGD training mean squared error: " +  str(training_error[0]))
+            print("SGD validation mean squared error:    " + str(validation_error));
+        
+    else:
        
-    
-    ##############################################################################################
-    
-    
-    ################################### task 3 - ealuate data ####################################
-    
-    # No text Features.        
-    
-    weights, error, X_train, training_time = redcoms.run_regression( closed_form=False, text_features=True, swear_words=False, size_comment=False, common_word_count=False, X=X_train, y=y_train, text=text_train, args=args )    
-    X_val = redcoms.add_features(X_val, text_val, closed_form=False, text_features=True, swear_words=False, size_comment=False,common_word_count=False);
-    mse, squared_error_array = redcoms.get_mse(X_val, y_val, weights)
-    print("SGD validation mean squared error:    " + str(mse[0]));
-    
-    #With Text Features
-    #SGD
-    
+       text, X, y = redcoms.preprocess_features(redcoms.data[1000:], text_features=text_features, most_common=most_common, stop_words=stop_words, swear_words=swear_words, discrete_swear_words=discrete_swear_words, comment_length=comment_length, binary_text=binary_text)
+       text_test, X_test, y_test = redcoms.preprocess_features(redcoms.data[:1000], text_features=text_features, most_common=most_common, stop_words=stop_words, swear_words=swear_words, discrete_swear_words=discrete_swear_words, comment_length=comment_length, binary_text=binary_text)
+     
+        #first 1000 for testing, last 1100 for train/valid split.
+        
+       foldnum = num_folds
+       seg_length = len(X)/num_folds
+       
+       
+       tempX = np.copy( X)
+       tempy = np.copy(y)
+       #starting weights
+       training_weights = np.zeros([X.shape[1], 1])
+       mean_train_mse_arr = np.array([])
+       mean_valid_mse_arr = np.array([])
+       for i in range(foldnum-1):
+           
+           seg_length = int(seg_length)
+           X_val = X[(i) * seg_length: (i+1)*seg_length]
+           y_val = y[(i) * seg_length: (i+1)*seg_length]
+           X_train = np.delete(tempX, [range((i) * seg_length,  (i+1)*seg_length)], axis=0)
+           y_train = np.delete(tempy, [range((i) * seg_length,  (i+1)*seg_length)], axis=0)
+           
+           #get training weights, input last iteration's training weights. 
+           training_weights, training_error, training_time = redcoms.regress_crossv( closed_form, X_train, y_train, training_weights, text, args )    
+         #  training_weights = training_weights[:, 0]
+           valid, squared_error_array = redcoms.get_mse_crossv(X_val, y_val, training_weights)
+           mean_train_mse_arr = np.append( mean_train_mse_arr, training_error)
+           mean_valid_mse_arr = np.append(mean_valid_mse_arr, valid)
+         #  test_error, square_error_array = redcoms.get_mse(X_test, y_test, training_weights)
+           print("Fold : " + str(i+1) + "\nTraining MSE: \t" + str(training_error) + "\nValidation MSE:\t : " + str(valid))
+       
+       
+       print ("\nmean of training: " + str(np.mean(mean_train_mse_arr)))
+       print("mean of valid :    " + str(np.mean(mean_valid_mse_arr)))
+       
+       
+       test_err, squared_error_array = redcoms.get_mse_crossv(X_val, y_val, training_weights)
+       print ("testing MSE:  " + str(np.mean(test_err)))
+       
+       
+       
+       
+       
