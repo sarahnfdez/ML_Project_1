@@ -832,11 +832,11 @@ if __name__ == "__main__":
     num_folds = 10
     closed_form = False
     text_features = True
-    most_common = 1
+    most_common = 160
     swear_words =False
     stop_words =  True
-    discrete_swear_words = False
-    comment_length = False
+    discrete_swear_words = True
+    comment_length = True
     binary_text = False
     
     if (not k_fold_cross_validation):
